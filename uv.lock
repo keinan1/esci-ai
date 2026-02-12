@@ -516,6 +516,7 @@ name = "esci-ai"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
+    { name = "logfire" },
     { name = "polars" },
     { name = "pydantic" },
     { name = "pydantic-ai" },
@@ -533,6 +534,7 @@ lint = [
 
 [package.metadata]
 requires-dist = [
+    { name = "logfire", specifier = ">=4.22.0" },
     { name = "polars", specifier = ">=1.38.1" },
     { name = "pydantic", specifier = ">=2.12.5" },
     { name = "pydantic-ai", specifier = ">=1.58.0" },

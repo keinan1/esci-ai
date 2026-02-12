@@ -16,3 +16,6 @@ data/processed/*
 
 # Marimo
 __marimo__/
+
+# Secrets
+.env
