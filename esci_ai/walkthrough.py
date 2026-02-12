@@ -80,7 +80,7 @@ def _(mo):
         ollama pull gpt-oss:latest
         ```
 
-    - Create a `.env` file (optional: only needed for pydnatic-logfire integration)
+    - Create a `.env` file (optional: only needed for pydantic-logfire integration)
     """)
     return
 
