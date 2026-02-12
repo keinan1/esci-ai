@@ -80,7 +80,29 @@ def _(mo):
         ollama pull gpt-oss:latest
         ```
 
-    - Create a `.env` file (optional: only needed for pydantic-logfire integration)
+    - Create a `.env` file (optional: only needed for pydantic-logfire integration, ask me for a key)
+
+        ```shell
+        touch .env
+        echo "PYDANTIC_LOGFIRE=<...project-api-key...>"
+        ```
+
+    - Download and process the esci data:
+
+        ```shell
+        uv run esci_ai/setup/download_data.py
+        uv run esci_ai/setup/process_data.py
+        ```
+
+       The processed data will be saved as parquet files in `data/processed/`.
+
+
+    - A bit self-referential: to run or edit this Marimo notebook:
+
+        ```shell
+        uv run marimo run esci_ai/walkthrough.py # read only
+        uv run marimo edit esci_ai/walkthrough.py # edit
+        ```
     """)
     return
 
