@@ -28,14 +28,16 @@ def _(mo):
 
     ## Plan and Constraints
 
-    While the task is focused on a small subset of the original dataset, the solution will only be of practical use if it can be used on the entire set of millions (?) of "E" queries to identify the mismatches. For example, the three outputs -- the product, the close-but-incorrect query, and the corrected query -- can be used to finetune an embedding model to move exact matches closer in the embedding space.
+    While the task is focused on a small subset (less than 50 observations) of the original dataset, the solution will only be of practical use if it can be used on the entire set of ~2 million "E" queries to identify the mismatches.
+
+    For example, the three outputs -- the product, the close-but-incorrect query, and the corrected query -- can be used to finetune an embedding model to move exact matches closer in the embedding space.
 
     The problem breaks into two different kinds of tasks:
 
     - [Task 1]: Binary classification - identify when the query is incorrect
     - [Task 2]: Text Generation - reformulate the query
 
-    The first task can in theory be done cheaply on millions of observations. With enough examples we could train a BERT model on query-product pairs, predicting match/no-match. And to bootstrap into this, we'd use the more expensive LLM approach to generate enough balanced labels (~1000) to train the BERT model.
+    The first task can in theory be performed efficiently on 2 million examples if we trained a BERT model on query-product pairs, predicting match/no-match. Since we don't have those labels, we'd use the more expensive LLM approach to generate enough balanced labels (~1000) to train the BERT model.
 
     The second task requires text generation, so we'll assume LLMs will be required even in the scaled solution. However, the number of cases will be relatively small, since we only have to do this for the mismatched pairs.
 
@@ -109,7 +111,68 @@ def _(mo):
 
 @app.cell
 def _():
+    from pathlib import Path
+    import polars as pl
+
+    project_dir = Path(__file__).parent.parent
+    data_dir = project_dir / "data"
+
+    examples_products = pl.read_parquet(
+        data_dir / "processed" / "examples_products.parquet"
+    )
+
+    examples_products.glimpse()
+
+    examples_products.group_by("esci_label").agg(
+        count=pl.count(),
+        unique_queries=pl.col("query_id").unique().count(),
+        unique_products=pl.col("product_id").unique().count(),
+    )
+    return data_dir, pl
+
+
+@app.cell
+def _(data_dir, pl):
+    df = pl.read_parquet(
+        data_dir / "processed" / "examples_products_subset.parquet"
+    )
+
+    df
     return
+
+
+@app.cell
+def _():
+    # by manual inspection alone, these are at least some of the incorrect observations (7/24 error rate)
+
+    incorrect_example_ids = [
+        # batteries
+        142660,  # 60 count
+        142666,  # AAA
+        # drills
+        660823,  # no mention of gyroscopic
+        660827,  # no mention of gyroscopic
+        660840,  # charger only
+        # paper
+        1163629,  # matte
+        1163641,  # matte
+    ]
+    return
+
+
+app._unparsable_cell(
+    r"""
+    from pydantic import BaseModel
+
+
+    class QueryInfo(BaseModel):
+        query_id: int
+        query: str
+
+    class ProductInfo(BaseModel)
+    """,
+    name="_"
+)
 
 
 if __name__ == "__main__":
