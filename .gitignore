@@ -13,3 +13,6 @@ wheels/
 data/raw/*
 data/processed/*
 .DS_Store
+
+# Marimo
+__marimo__/
