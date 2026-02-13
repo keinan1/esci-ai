@@ -69,6 +69,11 @@ def _():
         1163634,  # ambiguous: brand field lists Doaaler, title lists Kodak
         1163641,  # matte, not glossy
     ]
+
+    ambiguous_example_ids = [
+        # batteries
+        142661,  # title says 100 count, bullets say 50 bulk packaging (likely meaning 50 x 2)
+    ]
     return (negative_example_ids,)
 
 
@@ -80,11 +85,9 @@ def _():
 
     from pydantic import BaseModel, Field
 
-
     class QueryInfo(BaseModel):
         query_id: int
         query: str
-
 
     class ProductInfo(BaseModel):
         product_id: str
@@ -94,11 +97,9 @@ def _():
         product_brand: str
         product_color: str | None = None
 
-
     class MatchClassification(Enum):
         EXACT_MATCH = "exact_match"
         NOT_EXACT_MATCH = "not_exact_match"
-
 
     class QueryProductMatch(BaseModel):
         match_classification: MatchClassification = Field(
@@ -107,16 +108,14 @@ def _():
         )
         reasoning: str = Field(
             ...,
-            description=f"Succinct reason for the classification. If classified as a {MatchClassification.EXACT_MATCH.value}, return 'All query specifications satisfied by the product.' If classified as {MatchClassification.NOT_EXACT_MATCH.value}, cite precisely the query specification(s) not satisfied by the product.",
+            description=f"Succinct reason for the classification. If classified as a {MatchClassification.EXACT_MATCH}, return 'All query specifications satisfied by the product.' If classified as {MatchClassification.NOT_EXACT_MATCH}, cite precisely the query specification(s) not satisfied by the product.",
         )
-
 
     class CorrectQuery(BaseModel):
         correct_query: str = Field(
             ...,
             description="Given the product information, formulate a query for which the product would be an exact match",
         )
-
 
     class QueryProductExample(BaseModel):
         example_id: int
@@ -320,9 +319,7 @@ def _(
     true_positives = [
         e for e in exact_matches if e.example_id not in negative_example_ids
     ]
-    false_positives = [
-        e for e in exact_matches if e.example_id in negative_example_ids
-    ]
+    false_positives = [e for e in exact_matches if e.example_id in negative_example_ids]
     true_negatives = [
         e for e in not_exact_matches if e.example_id in negative_example_ids
     ]
@@ -337,12 +334,16 @@ def _(
     pprint(f"ACCURACY: {accuracy}")
     pprint(f"PRECISION: {precision}")
     pprint(f"RECALL: {recall}")
-    pprint("FALSE POSITIVES:")
+    pprint(
+        f"FALSE POSITIVES (non-matches classified as exact matches): {len(false_positives)}"
+    )
     for f in false_positives:
-        pprint(f)
-    pprint("FALSE NEGATIVES:")
+        pprint(f.model_dump())
+    pprint(
+        f"FALSE NEGATIVES (exact matches classified as non-matches): {len(false_negatives)}"
+    )
     for f in false_negatives:
-        pprint(f)
+        pprint(f.model_dump())
     return
 
 
