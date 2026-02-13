@@ -43,8 +43,8 @@ def _(mo):
 
     The only goal for this task is to get a working solution for a tiny subset of examples, however, we'll build with the points above in mind. In concrete terms:
 
-    - Aim to use a local LLM, as small as possible to get accurate results. We'll start with GPT-OSS-20B.
-    - Keep the implementation modular by separating out the classification and the text generation tasks. This will allow use of the first component just to scale up (generate labels to train a classifier) and the second to be reused in the scaled solution.
+    - Aim to use a local LLM, as small as possible to get accurate results. We'll start with [Ministral-3-8b-Instruct](https://huggingface.co/mistralai/Ministral-3-8B-Instruct-2512) as a baseline with the option to move up to the 14B model, or even down to the 3B model depending on results.
+    - Keep the implementation modular by separating out the classification and the text generation tasks. This will allow use of the first component just to scale up (generate labels to train a classifier) and the second to be reused in the scaled solution. It waill also allow using different LLM models if needed between the two tasks.
 
     ## Development Approach
 
@@ -75,11 +75,11 @@ def _(mo):
         curl -LsSf https://astral.sh/uv/install.sh | sh
         ```
 
-        - Install `ollama` and download `gpt-oss`
+        - Install `ollama` and download the model
 
         ```shell
         curl -fsSL https://ollama.com/install.sh | sh
-        ollama pull gpt-oss:latest
+        ollama pull ministral-3:8b # ollama pull gpt-oss:latest
         ```
 
     - Create a `.env` file (optional: only needed for pydantic-logfire integration, ask me for a key)
@@ -129,6 +129,24 @@ def _():
         unique_products=pl.col("product_id").unique().count(),
     )
     return data_dir, pl
+
+
+@app.cell
+def _(data_dir, pl):
+    products = pl.read_parquet(
+        data_dir / "raw" / "products.parquet"
+    )
+    products
+    return
+
+
+@app.cell
+def _(data_dir, pl):
+    examples = pl.read_parquet(
+        data_dir / "raw" / "examples.parquet"
+    )
+    examples
+    return
 
 
 @app.cell
