@@ -28,21 +28,23 @@ def _(mo):
 
     ## Plan and Constraints
 
-    While the task is focused on a small subset of the original dataset, the solution will only be of practical use if it can be used on the entire set of millions (?) of "E" queries to identify the mismatches. For example, the three outputs -- the product, the close-but-incorrect query, and the corrected query -- can be used to finetune an embedding model to move exact matches closer in the embedding space.
+    While the task is focused on a small subset (less than 50 observations) of the original dataset, the solution will only be of practical use if it can be used on the entire set of ~2 million "E" queries to identify the mismatches.
+
+    For example, the three outputs -- the product, the close-but-incorrect query, and the corrected query -- can be used to finetune an embedding model to move exact matches closer in the embedding space.
 
     The problem breaks into two different kinds of tasks:
 
     - [Task 1]: Binary classification - identify when the query is incorrect
     - [Task 2]: Text Generation - reformulate the query
 
-    The first task can in theory be done cheaply on millions of observations. With enough examples we could train a BERT model on query-product pairs, predicting match/no-match. And to bootstrap into this, we'd use the more expensive LLM approach to generate enough balanced labels (~1000) to train the BERT model.
+    The first task can in theory be performed efficiently on 2 million examples if we trained a BERT model on query-product pairs, predicting match/no-match. Since we don't have those labels, we'd use the more expensive LLM approach to generate enough balanced labels (~1000) to train the BERT model.
 
     The second task requires text generation, so we'll assume LLMs will be required even in the scaled solution. However, the number of cases will be relatively small, since we only have to do this for the mismatched pairs.
 
     The only goal for this task is to get a working solution for a tiny subset of examples, however, we'll build with the points above in mind. In concrete terms:
 
-    - Aim to use a local LLM, as small as possible to get accurate results. We'll start with GPT-OSS-20B.
-    - Keep the implementation modular by separating out the classification and the text generation tasks. This will allow use of the first component just to scale up (generate labels to train a classifier) and the second to be reused in the scaled solution.
+    - Aim to use a local LLM, as small as possible to get accurate results. We'll start with [Ministral-3-8b-Instruct](https://huggingface.co/mistralai/Ministral-3-8B-Instruct-2512) as a baseline with the option to move up to the 14B model, or even down to the 3B model depending on results.
+    - Keep the implementation modular by separating out the classification and the text generation tasks. This will allow use of the first component just to scale up (generate labels to train a classifier) and the second to be reused in the scaled solution. It waill also allow using different LLM models if needed between the two tasks.
 
     ## Development Approach
 
@@ -73,11 +75,11 @@ def _(mo):
         curl -LsSf https://astral.sh/uv/install.sh | sh
         ```
 
-        - Install `ollama` and download `gpt-oss`
+        - Install `ollama` and download the model
 
         ```shell
         curl -fsSL https://ollama.com/install.sh | sh
-        ollama pull gpt-oss:latest
+        ollama pull ministral-3:8b # ollama pull gpt-oss:latest
         ```
 
     - Create a `.env` file (optional: only needed for pydantic-logfire integration, ask me for a key)
@@ -109,7 +111,86 @@ def _(mo):
 
 @app.cell
 def _():
+    from pathlib import Path
+    import polars as pl
+
+    project_dir = Path(__file__).parent.parent
+    data_dir = project_dir / "data"
+
+    examples_products = pl.read_parquet(
+        data_dir / "processed" / "examples_products.parquet"
+    )
+
+    examples_products.glimpse()
+
+    examples_products.group_by("esci_label").agg(
+        count=pl.count(),
+        unique_queries=pl.col("query_id").unique().count(),
+        unique_products=pl.col("product_id").unique().count(),
+    )
+    return data_dir, pl
+
+
+@app.cell
+def _(data_dir, pl):
+    products = pl.read_parquet(
+        data_dir / "raw" / "products.parquet"
+    )
+    products
     return
+
+
+@app.cell
+def _(data_dir, pl):
+    examples = pl.read_parquet(
+        data_dir / "raw" / "examples.parquet"
+    )
+    examples
+    return
+
+
+@app.cell
+def _(data_dir, pl):
+    df = pl.read_parquet(
+        data_dir / "processed" / "examples_products_subset.parquet"
+    )
+
+    df
+    return
+
+
+@app.cell
+def _():
+    # by manual inspection alone, these are at least some of the incorrect observations (7/24 error rate)
+
+    incorrect_example_ids = [
+        # batteries
+        142660,  # 60 count
+        142666,  # AAA
+        # drills
+        660823,  # no mention of gyroscopic
+        660827,  # no mention of gyroscopic
+        660840,  # charger only
+        # paper
+        1163629,  # matte
+        1163641,  # matte
+    ]
+    return
+
+
+app._unparsable_cell(
+    r"""
+    from pydantic import BaseModel
+
+
+    class QueryInfo(BaseModel):
+        query_id: int
+        query: str
+
+    class ProductInfo(BaseModel)
+    """,
+    name="_"
+)
 
 
 if __name__ == "__main__":
