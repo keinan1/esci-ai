@@ -7,7 +7,6 @@ def process_data(data_dir: Path) -> None:
 
     # load datasets
     examples = pl.read_parquet(data_dir / "raw" / "examples.parquet")
-
     products = pl.read_parquet(data_dir / "raw" / "products.parquet")
 
     # join and save examples-products
