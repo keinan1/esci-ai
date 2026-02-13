@@ -117,36 +117,17 @@ def _():
     project_dir = Path(__file__).parent.parent
     data_dir = project_dir / "data"
 
-    examples_products = pl.read_parquet(
-        data_dir / "processed" / "examples_products.parquet"
-    )
+    df_all = pl.read_parquet(data_dir / "processed" / "examples_products.parquet")
 
-    examples_products.glimpse()
+    df_all.glimpse()
 
-    examples_products.group_by("esci_label").agg(
-        count=pl.count(),
+    # total examples by esci label
+    df_all.group_by("esci_label").agg(
+        count=pl.len(),
         unique_queries=pl.col("query_id").unique().count(),
         unique_products=pl.col("product_id").unique().count(),
     )
     return data_dir, pl
-
-
-@app.cell
-def _(data_dir, pl):
-    products = pl.read_parquet(
-        data_dir / "raw" / "products.parquet"
-    )
-    products
-    return
-
-
-@app.cell
-def _(data_dir, pl):
-    examples = pl.read_parquet(
-        data_dir / "raw" / "examples.parquet"
-    )
-    examples
-    return
 
 
 @app.cell
@@ -156,7 +137,7 @@ def _(data_dir, pl):
     )
 
     df
-    return
+    return (df,)
 
 
 @app.cell
@@ -178,19 +159,111 @@ def _():
     return
 
 
-app._unparsable_cell(
-    r"""
-    from pydantic import BaseModel
+@app.cell
+def _():
+    # define pydantic models to structure the task inputs (query-product examples) and outputs (query match, query reformulation)
+
+    from pydantic import BaseModel, Field
+    from enum import Enum
 
 
     class QueryInfo(BaseModel):
         query_id: int
         query: str
 
-    class ProductInfo(BaseModel)
-    """,
-    name="_"
-)
+
+    class ProductInfo(BaseModel):
+        product_id: str
+        product_title: str
+        product_description: str | None = None
+        product_bullet_point: str | None = None
+        product_brand: str
+        product_color: str | None = None
+
+
+    class MatchClassification(Enum):
+        EXACT_MATCH = "exact_match"
+        NOT_EXACT_MATCH = "not_exact_match"
+
+
+    class QueryProductMatch(BaseModel):
+        match_classification: MatchClassification = Field(
+            ...,
+            description="Classification of whether the product is an exact match for the query specifications.",
+        )
+        reasoning: str = Field(
+            ...,
+            description=f"""Succinct reason for the classification. If classified as {MatchClassification.EXACT_MATCH}, return 'All query specifications satisfied by the product.' If classified as {MatchClassification.NOT_EXACT_MATCH}, list which query specifications are not satisfied by the product.""",
+        )
+
+
+    class CorrectQuery(BaseModel):
+        correct_query: str = Field(
+            ...,
+            description="Given the product information, formulate a query for which the product would be an exact match",
+        )
+
+
+    class QueryProductExample(BaseModel):
+        example_id: int
+        query_info: QueryInfo
+        product_info: ProductInfo
+        query_product_match: QueryProductMatch | None = None
+        query_correction: CorrectQuery | None = None
+
+    return ProductInfo, QueryInfo, QueryProductExample
+
+
+@app.cell
+def _(ProductInfo, QueryInfo, QueryProductExample, df):
+    # create list of QueryProductExamples from df
+
+    examples = [
+        QueryProductExample(
+            example_id=row["example_id"],
+            query_info=QueryInfo(
+                query_id=row["query_id"],
+                query=row["query"],
+            ),
+            product_info=ProductInfo(
+                product_id=row["product_id"],
+                product_title=row["product_title"],
+                product_description=row.get("product_description", ""),
+                product_bullet_point=row.get("product_bullet_point", ""),
+                product_brand=row["product_brand"],
+                product_color=row.get("product_color", ""),
+            ),
+        )
+        for row in df.to_dicts()
+    ]
+
+    examples[:5]
+    return
+
+
+@app.cell
+async def _():
+    # test agent setup
+    # requires .env with ollama base url: see setup instructions
+
+    from dotenv import find_dotenv, load_dotenv
+    from pydantic_ai import Agent
+    from pprint import pprint
+
+    load_dotenv(find_dotenv())
+
+    test_settings = {
+        "temperature": 0,
+        "max_tokens": 150,
+    }
+
+    test_agent = Agent(
+        model="ollama:gpt-oss:20b"
+    )  # , model_settings=test_settings)
+
+    result = await test_agent.run("Tell me a joke about data scientists")
+    pprint(result.output)
+    return
 
 
 if __name__ == "__main__":
