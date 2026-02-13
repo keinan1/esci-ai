@@ -92,8 +92,7 @@ See the `pyproject.toml` for full details. The main dependencies will be:
 The basic solution is illustrated in the following Marimo notebook:
 
     ```shell
-    uv run marimo run esci_ai/walkthrough.py # read only, or
-    uv run marimo edit esci_ai/walkthrough.py # editable
+    uv run marimo edit notebooks/walkthrough.py
     ```
 ## Final Implementation
 
