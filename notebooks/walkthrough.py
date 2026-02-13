@@ -80,9 +80,11 @@ def _():
 
     from pydantic import BaseModel, Field
 
+
     class QueryInfo(BaseModel):
         query_id: int
         query: str
+
 
     class ProductInfo(BaseModel):
         product_id: str
@@ -92,9 +94,11 @@ def _():
         product_brand: str
         product_color: str | None = None
 
+
     class MatchClassification(Enum):
         EXACT_MATCH = "exact_match"
         NOT_EXACT_MATCH = "not_exact_match"
+
 
     class QueryProductMatch(BaseModel):
         match_classification: MatchClassification = Field(
@@ -103,14 +107,16 @@ def _():
         )
         reasoning: str = Field(
             ...,
-            description=f"Succinct reason for the classification. If classified as a {MatchClassification.EXACT_MATCH}, return 'All query specifications satisfied by the product.' If classified as {MatchClassification.NOT_EXACT_MATCH}, cite precisely the query specification(s) not satisfied by the product.",
+            description=f"Succinct reason for the classification. If classified as a {MatchClassification.EXACT_MATCH.value}, return 'All query specifications satisfied by the product.' If classified as {MatchClassification.NOT_EXACT_MATCH.value}, cite precisely the query specification(s) not satisfied by the product.",
         )
+
 
     class CorrectQuery(BaseModel):
         correct_query: str = Field(
             ...,
             description="Given the product information, formulate a query for which the product would be an exact match",
         )
+
 
     class QueryProductExample(BaseModel):
         example_id: int
@@ -173,8 +179,8 @@ async def _():
     logfire.instrument_pydantic_ai()
 
     test_settings = {
-        "temperature": 0,
-        "max_tokens": 150,
+        "temperature": 0.5,
+        "max_tokens": 100,
     }
 
     test_agent = Agent(
@@ -269,11 +275,14 @@ async def _(classifier_agent, examples):
     """
         for e in examples
     ]
+
     # batch run classifier agent
     start = time.time()
+
     match_results = await asyncio.gather(
         *[classifier_agent.run(mp) for mp in match_prompts]
     )
+
     end = time.time()
     total_time = end - start
     print(f"Execution time for {len(examples)} items: {round(total_time)} seconds")
@@ -311,7 +320,9 @@ def _(
     true_positives = [
         e for e in exact_matches if e.example_id not in negative_example_ids
     ]
-    false_positives = [e for e in exact_matches if e.example_id in negative_example_ids]
+    false_positives = [
+        e for e in exact_matches if e.example_id in negative_example_ids
+    ]
     true_negatives = [
         e for e in not_exact_matches if e.example_id in negative_example_ids
     ]
