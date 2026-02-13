@@ -293,6 +293,7 @@ def _(Agent, QueryProductMatch):
     classifier_agent = Agent(
         model="ollama:gpt-oss:20b",
         model_settings=model_settings,
+        max_concurrency=10,
         system_prompt=classifier_system_prompt,
         output_type=QueryProductMatch,
     )
@@ -309,7 +310,6 @@ async def _(classifier_agent, examples, pprint):
     <QUERY INFO>
     {_e.query_info.model_dump()}
     </QUERY INFO>
-
     <PRODUCT INFO>
     {_e.product_info.model_dump()}
     </PRODUCT INFO>
@@ -317,33 +317,35 @@ async def _(classifier_agent, examples, pprint):
 
     _result = await classifier_agent.run(_example_prompt)
 
-    pprint(f"EXAMPLE: {_example_prompt}")
+    pprint(f"EXAMPLE PROMPT: {_example_prompt}")
     pprint(f"RESULT: {_result.output}")
     pprint(f"CLASSIFICATION: {_result.output.match_classification.value}")
     return
 
 
 @app.cell
-def _(examples):
-    # all examples
+async def _(classifier_agent, examples):
+    # run all examples
+    # see https://ai.pydantic.dev/agent/#__tabbed_9_1
+
+    import asyncio
 
     # create prompts
-    example_prompts = []
-    for e in examples:
-        prompt = f"""
+    example_prompts = [
+        f"""
     <QUERY INFO>
     {e.query_info.model_dump()}
     </QUERY INFO>
-
     <PRODUCT INFO>
     {e.product_info.model_dump()}
     </PRODUCT INFO>
     """
-        example_prompts.append(prompt)
+        for e in examples
+    ]
 
-    example_prompts[:5]
-
-
+    results = await asyncio.gather(
+        *[classifier_agent.run(p) for p in example_prompts]
+    )
     return
 
 
