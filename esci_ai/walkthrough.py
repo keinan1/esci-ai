@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.19.10"
+__generated_with = "0.19.11"
 app = marimo.App(width="medium")
 
 
@@ -28,7 +28,7 @@ def _(mo):
 
     ## Plan and Constraints
 
-    While the task is focused on a small subset (less than 50 observations) of the original dataset, the solution will only be of practical use if it can be used on the entire set of ~2 million "E" queries to identify the mismatches.
+    While the task is focused on a small subset of the original dataset (less than 20 observations), the solution will only be of practical use if it can be used on the entire set of ~2 million "E" queries to identify the mismatches.
 
     For example, the three outputs -- the product, the close-but-incorrect query, and the corrected query -- can be used to finetune an embedding model to move exact matches closer in the embedding space.
 
@@ -41,9 +41,9 @@ def _(mo):
 
     The second task requires text generation, so we'll assume LLMs will be required even in the scaled solution. However, the number of cases will be relatively small, since we only have to do this for the mismatched pairs.
 
-    The only goal for this task is to get a working solution for a tiny subset of examples, however, we'll build with the points above in mind. In concrete terms:
+    The only goal for this task is to get a working solution for subset of 20 examples. However, we'll build with the points above in mind. In concrete terms:
 
-    - Aim to use a local LLM, as small as possible to get accurate results. We'll start with [Ministral-3-8b-Instruct](https://huggingface.co/mistralai/Ministral-3-8B-Instruct-2512) as a baseline with the option to move up to the 14B model, or even down to the 3B model depending on results.
+    - Aim to use a local LLM, as small as possible to get accurate results. We'll start with [Ministral-3-8b-Instruct](https://huggingface.co/mistralai/Ministral-3-8B-Instruct-2512) as a baseline with the option to move up to the 14B model, or down to the 3B model depending on results.
     - Keep the implementation modular by separating out the classification and the text generation tasks. This will allow use of the first component just to scale up (generate labels to train a classifier) and the second to be reused in the scaled solution. It waill also allow using different LLM models if needed between the two tasks.
 
     ## Development Approach
@@ -146,15 +146,15 @@ def _():
 
     incorrect_example_ids = [
         # batteries
-        142660,  # 60 count
-        142666,  # AAA
+        142660,  # 60 count, not 100 count
+        142666,  # AAA, not AA
         # drills
         660823,  # no mention of gyroscopic
         660827,  # no mention of gyroscopic
-        660840,  # charger only
+        660840,  # charger only, no drill
         # paper
-        1163629,  # matte
-        1163641,  # matte
+        1163629,  # matte, not glossy
+        1163641,  # matte, not glossy
     ]
     return
 
@@ -193,7 +193,7 @@ def _():
         )
         reasoning: str = Field(
             ...,
-            description=f"""Succinct reason for the classification. If classified as {MatchClassification.EXACT_MATCH}, return 'All query specifications satisfied by the product.' If classified as {MatchClassification.NOT_EXACT_MATCH}, list which query specifications are not satisfied by the product.""",
+            description=f"""Succinct reason for the classification. If classified as a {MatchClassification.EXACT_MATCH}, return 'All query specifications satisfied by the product.' If classified as {MatchClassification.NOT_EXACT_MATCH}, list which query specifications are not satisfied by the product.""",
         )
 
 
@@ -211,7 +211,7 @@ def _():
         query_product_match: QueryProductMatch | None = None
         query_correction: CorrectQuery | None = None
 
-    return ProductInfo, QueryInfo, QueryProductExample
+    return ProductInfo, QueryInfo, QueryProductExample, QueryProductMatch
 
 
 @app.cell
@@ -238,7 +238,7 @@ def _(ProductInfo, QueryInfo, QueryProductExample, df):
     ]
 
     examples[:5]
-    return
+    return (examples,)
 
 
 @app.cell
@@ -258,11 +258,92 @@ async def _():
     }
 
     test_agent = Agent(
-        model="ollama:gpt-oss:20b"
-    )  # , model_settings=test_settings)
+        model="ollama:gpt-oss:20b",
+        model_settings=test_settings,
+    )
 
-    result = await test_agent.run("Tell me a joke about data scientists")
-    pprint(result.output)
+    test_result = await test_agent.run("Tell me a joke about data scientists")
+    pprint(test_result.output)
+    return Agent, pprint
+
+
+@app.cell
+def _(Agent, QueryProductMatch):
+    classifier_system_prompt = """
+    <TASK OVERVIEW>
+    You are a quality assurance agent helping to improve a product query system. /
+    Your task is to examine a query-product pair, and determine whether the product exactly matches the query.
+    </TASK OVERVIEW>
+
+    <INSTRUCTIONS>
+    To accomplish this task:
+
+    1. Consider all the explicit specifications detailed in the query
+    2. Examine all the explicit product details
+    3. Determine whether all query specifications are explicitly met in the product details.
+    4. Output your final answer with appropriate explanation.
+    </INSTRUCTIONS>
+    """
+
+    model_settings = {
+        "temperature": 0,
+        "max_tokens": 150,
+    }
+
+    classifier_agent = Agent(
+        model="ollama:gpt-oss:20b",
+        model_settings=model_settings,
+        system_prompt=classifier_system_prompt,
+        output_type=QueryProductMatch,
+    )
+    return (classifier_agent,)
+
+
+@app.cell
+async def _(classifier_agent, examples, pprint):
+    # test example
+
+    _e = examples[4]
+
+    _example_prompt = f"""
+    <QUERY INFO>
+    {_e.query_info.model_dump()}
+    </QUERY INFO>
+
+    <PRODUCT INFO>
+    {_e.product_info.model_dump()}
+    </PRODUCT INFO>
+    """
+
+    _result = await classifier_agent.run(_example_prompt)
+
+    pprint(f"EXAMPLE: {_example_prompt}")
+    pprint(f"RESULT: {_result.output}")
+    pprint(f"CLASSIFICATION: {_result.output.match_classification.value}")
+    return
+
+
+@app.cell
+def _(examples):
+    # all examples
+
+    # create prompts
+    example_prompts = []
+    for e in examples:
+        prompt = f"""
+    <QUERY INFO>
+    {e.query_info.model_dump()}
+    </QUERY INFO>
+
+    <PRODUCT INFO>
+    {e.product_info.model_dump()}
+    </PRODUCT INFO>
+    """
+        example_prompts.append(prompt)
+
+    example_prompts[:5]
+
+
     return
 
 
