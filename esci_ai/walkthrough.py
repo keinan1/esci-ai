@@ -294,6 +294,7 @@ def _(Agent, QueryProductMatch):
         model="ollama:gpt-oss:20b",
         model_settings=model_settings,
         max_concurrency=10,
+        retries=2,
         system_prompt=classifier_system_prompt,
         output_type=QueryProductMatch,
     )
@@ -325,13 +326,13 @@ async def _(classifier_agent, examples, pprint):
 
 @app.cell
 async def _(classifier_agent, examples):
-    # run all examples
+    # run all classification examples
     # see https://ai.pydantic.dev/agent/#__tabbed_9_1
 
     import asyncio
 
     # create prompts
-    example_prompts = [
+    match_prompts = [
         f"""
     <QUERY INFO>
     {e.query_info.model_dump()}
@@ -342,10 +343,14 @@ async def _(classifier_agent, examples):
     """
         for e in examples
     ]
-
-    results = await asyncio.gather(
-        *[classifier_agent.run(p) for p in example_prompts]
+    # batch run classifier agent
+    match_results = await asyncio.gather(
+        *[classifier_agent.run(mp) for mp in match_prompts]
     )
+    # add classification to examples
+    # note: asyncio.gather guarantees list order, so this zip pairing is safe
+    for e, mr in zip(examples, match_results):
+        e.query_product_match = mr.output
     return
 
 
