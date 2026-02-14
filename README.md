@@ -34,9 +34,9 @@ The only goal for this task is to get a working solution for subset of 20 exampl
 
 We'll use the following development process:
 
-- Step 1: Build quick prototype
+- Step 1: Build quick prototype with evals
 - Step 2: Perform error analysis on traces
-- Step 3: Create automated evals on results
+- Step 3: Create axial codes and improve prompts
 - Step 4: Iterate until all examples are corrrect
 
 ## Tooling
@@ -47,8 +47,7 @@ See the `pyproject.toml` for full details. The main dependencies will be:
 - `ollama` for local model inference
 - `pydantic` for structured outputs
 - `pydantic-ai` for lightweight llm orchestration
-- `pydantic-logfire` for llm observability
-- `pydantic-evals` to create and run automated evals
+- `pydantic-logfire` for llm observability (optional, not needed to run)
 
 ## Setup
 
@@ -87,13 +86,44 @@ See the `pyproject.toml` for full details. The main dependencies will be:
 
    The processed data will be saved as parquet files in `data/processed/`.
 
-## Interactive Notebook
+## Development Process
 
-The basic solution is illustrated in the following Marimo notebook:
+The workflow leading to the final solution is illustrated in the `notebooks/` directory.
 
-    ```shell
-    uv run marimo edit notebooks/walkthrough.py
-    ```
+### Step 1 - First Pass Solution
+
+In the first pass solution we define the data models, prompts, and performance metrics. We run inference on the smallest model, `ministral-3:3b`, and record the traces and the performance metrics for the twenty examples (accuracy, precision, recall). You can run the notebook with:
+
+```shell
+uv run marimo edit notebooks/01_first_pass_solution.py
+```
+
+### Step 2 - Error Analysis
+
+The first pass on `ministral-3:3b` performed poorly: accuracy is 0.67, with 1 false positive (i.e., llm categorized non-match as a match) and 7 false negatives (i.e. llm categorized match as non-match)
+
+We collect the traces for all 8 incorrect inferences and perform a manual error analysis. For each trace, we manually record an observation of what went wrong, and a possible fix. See `notebooks/02_first_pass_error_analysis.md`.
+
+### Step 3 - Axial Coding & Prompt Improvement
+
+Here we use Claude to categorize our manual error analysis into proper axial codes. We then ask it to suggest minimal viable prompt improvements from the axial codes and our prior fix suggestions. See `notebooks/03_first_pass_axial_codes.md`.
+
+### Step 4 - Second Pass Solution
+
+We update the prompts and re-run the experiment. Performance improves: using `ministral-3:3b`, accuracy improves to ..., with only 1 false positive. Using the next most capable model, `ministral-3:8b`, accuracy is ... .
+
+Run the notebook with:
+
+```shell
+uv run marimo edit notebooks/02_secon_pass_solution.py
+```
+
 ## Final Implementation
 
-The final python implementation is in `esci_ai/`.
+The final python implementation is in `esci_ai/`. We organize the modules into proper files and classes. The script can be run with:
+
+```
+
+```
+
+Results and performance metrics are written to the `data/results` directory.
