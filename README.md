@@ -12,7 +12,7 @@ The task is to identify examples where "E" is misapplied for three specific quer
 
 ## Plan and Constraints
 
-While the task is focused on a small subset of the original dataset (less than 20 observations), the solution will only be of practical use if it can be used on the entire set of ~2 million "E" queries to identify the mismatches.
+While the task is focused on a small subset of the original dataset (24 examples), the solution will be of most  practical use if it can be used on the entire set of ~2 million "E" queries to identify the mismatches.
 
 For example, the three outputs -- the product, the close-but-incorrect query, and the corrected query -- can be used to finetune an embedding model to move exact matches closer in the embedding space.
 
@@ -21,34 +21,36 @@ The problem breaks into two different kinds of tasks:
 - [Task 1]: Binary classification - identify when the query is incorrect
 - [Task 2]: Text Generation - reformulate the query
 
-The first task can in theory be performed efficiently on 2 million examples if we trained a BERT model on query-product pairs, predicting match/no-match. Since we don't have those labels, we'd use the more expensive LLM approach to generate enough balanced labels (~1000) to train the BERT model.
+The first task can in theory be performed efficiently on 2 million examples if we trained a BERT model on query-product pairs, predicting match/no-match. Since we don't have those labels, we'd use the more expensive LLM approach to generate enough balanced labels (~1-5K) to train the BERT model.
 
 The second task requires text generation, so we'll assume LLMs will be required even in the scaled solution. However, the number of cases will be relatively small, since we only have to do this for the mismatched pairs.
 
-The only goal for this task is to get a working solution for subset of 20 examples. However, we'll build with the points above in mind. In concrete terms:
+The only goal for this task is to get a working solution for the subset of 24 examples, but we'll build with the points above in mind. In concrete terms:
 
 - Aim to use a local LLM, as small as possible to get accurate results. We'll start with [Ministral-3-3b-Instruct](https://huggingface.co/mistralai/Ministral-3-8B-Instruct-2512) as a baseline, with the option to move up to [Ministral-3-8b-Instruct](https://huggingface.co/mistralai/Ministral-3-8B-Reasoning-2512), [Ministral-3-14b-Instruct](https://huggingface.co/mistralai/Ministral-3-14B-Instruct-2512), and finally [gpt-oss-20b](https://huggingface.co/openai/gpt-oss-20b).
-- Keep the implementation modular by separating out the classification and the text generation tasks. This will allow use of the first component just to scale up (generate labels to train a classifier) and the second to be reused in the scaled solution. It waill also allow using different LLM models if needed between the two tasks.
+- Keep the implementation modular by separating out the classification and the text generation tasks. This will allow use of the first component just to scale up (e.g., generate labels to train a classifier) and the second to be reused in the scaled solution. It will also allow using different LLM models if needed between the two tasks, and it will allow using the first (classifier) model to test the performance of the second (query generation) model.
 
 ## Development Approach
 
 We'll use the following development process:
 
-- Step 1: Build quick prototype
+- Step 1: Build quick prototype with evals
 - Step 2: Perform error analysis on traces
-- Step 3: Create automated evals on results
+- Step 3: Create axial codes and improve prompts
 - Step 4: Iterate until all examples are corrrect
 
 ## Tooling
 
-See the `pyproject.toml` for full details. The main dependencies will be:
+See the `pyproject.toml` for full details. The main system dependencies will be:
 
 - `uv` for package management
 - `ollama` for local model inference
+
+And the main project dependencies will be:
+
 - `pydantic` for structured outputs
 - `pydantic-ai` for lightweight llm orchestration
-- `pydantic-logfire` for llm observability
-- `pydantic-evals` to create and run automated evals
+- `pydantic-logfire` for llm observability (optional, not needed to run)
 
 ## Setup
 
@@ -65,9 +67,9 @@ See the `pyproject.toml` for full details. The main dependencies will be:
 
     ```shell
     curl -fsSL https://ollama.com/install.sh | sh
-    ollama pull ollama pull gpt-oss:latest
+    ollama pull ollama pull ministral-3:3b
     ```
-    Note in testing we also use `ministral-3:3b`, `ministral-3:8b`, and  `ministral-3:14b`. 
+    Note in testing we also use `ministral-3:8b`, and  `ministral-3:14b`, `gpt-oss:latest`.
 
 - Create a `.env` file 
 
@@ -85,15 +87,50 @@ See the `pyproject.toml` for full details. The main dependencies will be:
     uv run esci_ai/setup/process_data.py
     ```
 
-   The processed data will be saved as parquet files in `data/processed/`.
+   The processed data will appear as parquet files in `data/processed/`.
 
-## Interactive Notebook
+## Development Process
 
-The basic solution is illustrated in the following Marimo notebook:
+The workflow leading to the final solution is illustrated in the `notebooks/` directory.
 
-    ```shell
-    uv run marimo edit notebooks/walkthrough.py
-    ```
+### Step 1 - First Pass Solution
+
+In the first pass solution we focus just on Task 1: classifying mismatches. We define the data models, prompts, and a `classifier_agent`, together with performance testing (accuracy, precision, recall). We run inference on the smallest model, `ministral-3:3b`, and record the traces and the performance metrics for the 24 examples.
+
+Run the notebook with:
+
+```shell
+uv run marimo edit notebooks/01_first_pass_solution.py
+```
+
+### Step 2 - Error Analysis
+
+The first pass on `ministral-3:3b` performed poorly: accuracy is 0.67, with 1 false positive (i.e., llm categorized non-match as a match) and 7 false negatives (i.e. llm categorized match as a non-match)
+
+We collect the traces for all 8 incorrect inferences and perform a manual error analysis. For each trace, we manually record an observation of what went wrong, and a possible fix. See `notebooks/02_first_pass_error_analysis.md`.
+
+### Step 3 - Axial Coding & Prompt Improvement
+
+Here we use Claude to categorize our manual error analysis into proper axial codes. We then ask it to suggest minimal viable prompt improvements from the axial codes and our prior fix suggestions. See `notebooks/03_first_pass_axial_codes.md`.
+
+### Step 4 - Second Pass Solution
+
+We update the prompts and re-run the experiment. Performance improves: using `ministral-3:3b` we get perfect accuracy. We also test on the larger `ministral-3:8b`, `ministral-3:14b`, and `gpt-oss-20b` models. Aside from two ambiguous test examples with inconsistent product information, all models perform with perfect accuracy on the testing set.
+
+With the classifer in place, we move to Task 2: correcting queries in mismatched cases. We create a `query_fix_agent` and run it just on the predicted mismatched examples.
+
+With tinkering to the prompt we get valid query fixes for all mismatched examples using the second smallest model, `ministral-3:8b`. While the smaller `ministral-3:3b` performed well most of the time, it failed to follow instructions in longer and more complicated cases, so we will assume it's not quite up to the task.01_
+
+Run the notebook with:
+
+```shell
+uv run marimo edit notebooks/04_second_pass_solution.py
+```
+
 ## Final Implementation
 
-The final python implementation is in `esci_ai/`.
+The final python implementation is in `esci_ai/`. We organize the modules into proper files and classes. The script can be run with:
+
+```
+
+```
