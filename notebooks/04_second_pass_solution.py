@@ -66,13 +66,14 @@ def _():
         660838,  # charger only, no drill
         # paper
         1163629,  # matte, not glossy
-        1163634,  # ambiguous: brand field lists Doaaler, title lists Kodak
         1163641,  # matte, not glossy
     ]
 
     ambiguous_example_ids = [
         # batteries
-        142661,  # title says 100 count, bullets say 50 bulk packaging (likely meaning 50 x 2)
+        142661,  # ambiguous: title field says 100 count, bullet field says 50 count
+        # paper
+        1163634,  # ambiguous: title field says Kodak, brand field says Doaaler
     ]
     return (negative_example_ids,)
 
@@ -214,9 +215,9 @@ def _(Agent, QueryProductMatch):
     </TASK OVERVIEW>
 
     <DEFINITION OF EXACT MATCH>
-    A product is an exact match when every specification in the query is satisfied by the product information.
+    A product is an exact match when precisely every specification in the query is satisfied by the product information.
     - The product MAY have additional features, details, or attributes beyond what the query asks for. This is fine — only the query's specifications must be met.
-    - Match on MEANING, not exact wording.
+    - Match on MEANING, not exact wording, except in cases where the query specifies technical product codes or model designations.
     - Use common sense and domain knowledge to interpret both queries and product details.
     </DEFINITION OF EXACT MATCH>
 
@@ -362,6 +363,11 @@ def _(
     )
     for f in false_negatives:
         pprint(f.model_dump())
+    return
+
+
+@app.cell
+def _():
     return
 
 
