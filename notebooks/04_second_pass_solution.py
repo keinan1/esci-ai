@@ -1,7 +1,7 @@
 import marimo
 
 __generated_with = "0.19.11"
-app = marimo.App(width="medium")
+app = marimo.App(width="medium", auto_download=["html"])
 
 
 @app.cell
@@ -66,13 +66,14 @@ def _():
         660838,  # charger only, no drill
         # paper
         1163629,  # matte, not glossy
-        1163634,  # ambiguous: brand field lists Doaaler, title lists Kodak
         1163641,  # matte, not glossy
     ]
 
     ambiguous_example_ids = [
         # batteries
-        142661,  # title says 100 count, bullets say 50 bulk packaging (likely meaning 50 x 2)
+        142661,  # ambiguous: title field says 100 count, bullet field says 50 count
+        # paper
+        1163634,  # ambiguous: title field says Kodak, brand field says Doaaler
     ]
     return (negative_example_ids,)
 
@@ -121,10 +122,16 @@ def _():
         )
 
 
-    class CorrectQuery(BaseModel):
-        correct_query: str = Field(
+    class QueryFix(BaseModel):
+        reasoning: str = Field(
             ...,
-            description="Given the product information, formulate a query for which the product would be an exact match",
+            description=(
+                "Succinct reasoning. Cite precisely which specification(s) are not met and need to be corrected in the query."
+            ),
+        )
+        corrected_query: str = Field(
+            ...,
+            description="Provide the corrected query and nothing else.",
         )
 
 
@@ -133,11 +140,12 @@ def _():
         query_info: QueryInfo
         product_info: ProductInfo
         query_product_match: QueryProductMatch | None = None
-        query_correction: CorrectQuery | None = None
+        query_fix: QueryFix | None = None
 
     return (
         MatchClassification,
         ProductInfo,
+        QueryFix,
         QueryInfo,
         QueryProductExample,
         QueryProductMatch,
@@ -214,9 +222,9 @@ def _(Agent, QueryProductMatch):
     </TASK OVERVIEW>
 
     <DEFINITION OF EXACT MATCH>
-    A product is an exact match when every specification in the query is satisfied by the product information.
+    A product is an exact match when precisely every specification in the query is satisfied by the product information.
     - The product MAY have additional features, details, or attributes beyond what the query asks for. This is fine — only the query's specifications must be met.
-    - Match on MEANING, not exact wording.
+    - Match on MEANING, not exact wording, except in cases where the query specifies technical product codes or model designations.
     - Use common sense and domain knowledge to interpret both queries and product details.
     </DEFINITION OF EXACT MATCH>
 
@@ -244,7 +252,7 @@ def _(Agent, QueryProductMatch):
         system_prompt=classifier_system_prompt,
         output_type=QueryProductMatch,
     )
-    return (classifier_agent,)
+    return classifier_agent, classifier_system_prompt, model_settings
 
 
 @app.cell
@@ -302,7 +310,7 @@ async def _(classifier_agent, examples):
     total_time = end - start
     print(f"Execution time for {len(examples)} items: {round(total_time)} seconds")
     print(f"Average {round(total_time / len(examples))} seconds per item")
-    return (match_results,)
+    return asyncio, match_results, time
 
 
 @app.cell
@@ -362,6 +370,127 @@ def _(
     )
     for f in false_negatives:
         pprint(f.model_dump())
+    return
+
+
+@app.cell
+def _(Agent, QueryFix, classifier_system_prompt, model_settings):
+    # create query fix agent
+
+    query_fix_system_prompt = """
+    <TASK OVERVIEW>
+    You are a world-class quality assurance agent responsible for improving a product query system.
+    You will be given a query-product pair where the query does not exactly match the product information.
+    Your task is to provide the MINIMAL SUBSTANTIVE FIX TO THE INCORRECT QUERY such that the product would be an exact match for it.
+    </TASK OVERVIEW>
+
+    <DEFINITION OF EXACT MATCH>
+    A product is an exact match when precisely every specification in the query is satisfied by the product information.
+    - The product MAY have additional features, details, or attributes beyond what the query asks for. This is fine — only the query's specifications must be met.
+    - Match on MEANING, not exact wording, except in cases where the query specifies technical product codes or model designations.
+    - Use common sense and domain knowledge to interpret both queries and product details.
+    </DEFINITION OF EXACT MATCH>
+
+    <INSTRUCTIONS>
+    1. Provide the MINIMAL SUBSTANTIVE FIX TO THE INCORRECT QUERY such that the product would be an exact match for it.
+    2. The corrected_query field must contain your corrected query and nothing else.
+    </INSTRUCTIONS>
+    """
+
+    query_fix_agent = Agent(
+        # model="ollama:ministral-3:3b",
+        model="ollama:ministral-3:8b",
+        # model="ollama:ministral-3:14b",
+        # model="ollama:gpt-oss:20b",
+        model_settings=model_settings,
+        max_concurrency=10,
+        retries=2,
+        system_prompt=classifier_system_prompt,
+        output_type=QueryFix,
+    )
+    return (query_fix_agent,)
+
+
+@app.cell
+async def _(examples, pprint, query_fix_agent):
+    # query fix test example
+
+    _e = examples[4]
+
+    _example_prompt = f"""
+    <INCORRECT QUERY INFO>
+    {_e.query_info.model_dump()}
+    </INCORRECT QUERY INFO>
+    <PRODUCT INFO>
+    {_e.product_info.model_dump()}
+    </PRODUCT INFO>
+    """
+
+    _result = await query_fix_agent.run(_example_prompt)
+
+    pprint(f"EXAMPLE PROMPT: {_example_prompt}")
+    pprint(f"RESULT: {_result.output}")
+    pprint(f"FIXED QUERY: {_result.output.corrected_query}")
+    return
+
+
+@app.cell
+async def _(MatchClassification, asyncio, examples, query_fix_agent, time):
+    # run query fix on all not_exact_match predictions
+
+    predicted_not_exact_match = [
+        e
+        for e in examples
+        if e.query_product_match.match_classification.value
+        == MatchClassification.NOT_EXACT_MATCH.value
+    ]
+
+    # create prompts
+    query_fix_prompts = [
+        f"""
+    <PRODUCT INFO>
+    {e.product_info.model_dump()}
+    </PRODUCT INFO>
+    <INCORRECT QUERY INFO>
+    {e.query_info.model_dump()}
+    </INCORRECT QUERY INFO>
+    """
+        for e in predicted_not_exact_match
+    ]
+
+    # batch run classifier agent
+    _start = time.time()
+
+    query_fix_results = await asyncio.gather(
+        *[query_fix_agent.run(qfp) for qfp in query_fix_prompts]
+    )
+
+    _end = time.time()
+    _total_time = _end - _start
+    print(
+        f"Execution time for {len(query_fix_prompts)} items: {round(_total_time)} seconds"
+    )
+    print(
+        f"Average {round(_total_time / len(query_fix_prompts))} seconds per item"
+    )
+    return predicted_not_exact_match, query_fix_results
+
+
+@app.cell
+def _(query_fix_results):
+    query_fix_results
+    return
+
+
+@app.cell
+def _(predicted_not_exact_match, query_fix_results):
+    # manually eyeball performance
+
+    # add fixed prompt to examples
+    for _x, _y in zip(predicted_not_exact_match, query_fix_results):
+        _x.query_fix = _y.output
+
+    predicted_not_exact_match
     return
 
 
