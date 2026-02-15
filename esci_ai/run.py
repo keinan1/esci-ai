@@ -85,7 +85,6 @@ async def get_classifications(
     agent = create_classifier_agent(model)
     prompts = [create_classifier_prompt(e) for e in examples]
 
-    # run classifications; note, should properly set return_exceptions=True and filter failures, etc...
     start = time.time()
     results: list[
         AgentRunResult[QueryProductMatch] | BaseException
@@ -109,7 +108,6 @@ async def get_queryfixes(
     agent = create_queryfix_agent(model)
     prompts = [create_queryfix_prompt(e) for e in examples]
 
-    # run query fixes; note, should properly set return_exceptions=True and filter failures, etc...
     start = time.time()
     results: list[AgentRunResult[QueryFix] | BaseException] = await asyncio.gather(
         *[agent.run(p) for p in prompts],
@@ -154,6 +152,8 @@ async def main(model: str = DEFAULT_MODEL, df_path: Path = DEFAULT_DATASET_PATH)
 
     # add results to examples, silently ignore run failures
     for e, r in zip(examples, classifier_results):
+        if isinstance(r, BaseException):
+            continue
         e.query_product_match = r.output
 
     # generate performance report
@@ -168,7 +168,8 @@ async def main(model: str = DEFAULT_MODEL, df_path: Path = DEFAULT_DATASET_PATH)
     negative_examples: list[QueryProductExample] = [
         e
         for e in examples
-        if e.query_product_match.match_classification
+        if e.query_product_match is not None
+        and e.query_product_match.match_classification
         == MatchClassification.NOT_EXACT_MATCH
     ]
 
@@ -177,6 +178,8 @@ async def main(model: str = DEFAULT_MODEL, df_path: Path = DEFAULT_DATASET_PATH)
 
     # add results to negative predictions, silently ignore errors
     for e, r in zip(negative_examples, queryfix_results):
+        if isinstance(r, BaseException):
+            continue
         e.query_fix = r.output
 
     results_path = DATA_DIR / "results" / f"{run_id}_predictions.json"

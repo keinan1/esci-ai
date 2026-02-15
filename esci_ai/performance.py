@@ -36,12 +36,15 @@ def get_classifier_performance(
     positives = [
         p
         for p in preds
-        if p.query_product_match.match_classification == MatchClassification.EXACT_MATCH
+        if p.query_product_match is not None
+        and p.query_product_match.match_classification
+        == MatchClassification.EXACT_MATCH
     ]
     negatives = [
         p
         for p in preds
-        if p.query_product_match.match_classification
+        if p.query_product_match is not None
+        and p.query_product_match.match_classification
         == MatchClassification.NOT_EXACT_MATCH
     ]
     true_positives = [e for e in positives if e.example_id not in NEGATIVE_EXAMPLE_IDS]
