@@ -42,6 +42,16 @@ def process_data(data_dir: Path) -> None:
         data_dir / "processed" / "examples_products_subset.parquet"
     )
 
+    # save a randomly selected sample of 1000 for additional testing (include subset for performance metrics)
+    pl.concat(
+        [
+            examples_products_subset,
+            examples_products.sample(n=1000, seed=73),
+        ]
+    ).unique().write_parquet(
+        data_dir / "processed" / "examples_products_random_1000.parquet"
+    )
+
     print(f"Finished. Processed data saved to {data_dir / 'processed'}")
 
 

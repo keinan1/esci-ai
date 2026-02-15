@@ -67,9 +67,15 @@ And the main project dependencies will be:
 
     ```shell
     curl -fsSL https://ollama.com/install.sh | sh
-    ollama pull ollama pull ministral-3:3b
+    ollama pull ministral-3:3b
+    ollama pull ministral-3:8b
     ```
-    Note in testing we also use `ministral-3:8b`, and  `ministral-3:14b`, `gpt-oss:latest`.
+    Note in testing we also use `ministral-3:14b`, `gpt-oss:latest`. Optionally download with:
+
+    ```shell
+    ollama pull ministral-3:14b
+    ollama pull gpt-oss:latest
+    ```
 
 - Create a `.env` file 
 
