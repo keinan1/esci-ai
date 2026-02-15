@@ -20,13 +20,15 @@ class ClassifierPerformance:
 def get_classifier_performance(
     predictions: list[QueryProductExample], report_path: str | Path | None = None
 ) -> ClassifierPerformance | None:
-
     # filter classified examples
     preds = predictions.copy()
+    eval_ids = set(POSITIVE_EXAMPLE_IDS + NEGATIVE_EXAMPLE_IDS + AMBIGUOUS_EXAMPLE_IDS)
     preds = [
         p
         for p in preds
-        if p.query_product_match and p.query_product_match.match_classification
+        if p.example_id in eval_ids
+        and p.query_product_match is not None
+        and p.query_product_match.match_classification
     ]
 
     if len(preds) < 3:
@@ -80,6 +82,29 @@ def get_classifier_performance(
 
     return performance
 
+
+POSITIVE_EXAMPLE_IDS = [
+    # batteries
+    142651,
+    142652,
+    142653,
+    142659,
+    # 142661, ambiguous
+    142663,
+    # drills
+    660833,
+    660840,
+    660842,
+    # paper
+    1163628,
+    1163633,
+    # 1163634, # ambiguous
+    1163638,
+    1163639,
+    1163640,
+    1163642,
+    1163643,
+]
 
 NEGATIVE_EXAMPLE_IDS = [
     # batteries
