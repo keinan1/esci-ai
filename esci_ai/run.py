@@ -128,7 +128,7 @@ async def main(model: str = DEFAULT_MODEL):
     setup_logging()
     setup_observability()
 
-    run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+    run_id = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{model}"
 
     examples = load_examples(
         DATA_DIR / "processed" / "examples_products_subset.parquet"
@@ -142,12 +142,12 @@ async def main(model: str = DEFAULT_MODEL):
         e.query_product_match = r.output
 
     # generate performance report
-    report_path = DATA_DIR / "results" / f"{run_id}_performance_report.json"
+    report_path = DATA_DIR / "results" / f"{run_id}_classifier_performance.json"
     classifier_performance = get_classifier_performance(
         examples, report_path=report_path
     )
     logger.info(classifier_performance)
-    logger.info(f"Classification performance report generated at {report_path}")
+    logger.info(f"Classier performance report generated at {report_path}")
 
     # filter negative predictions for query fix
     negative_examples: list[QueryProductExample] = [
