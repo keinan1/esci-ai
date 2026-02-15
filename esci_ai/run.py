@@ -185,6 +185,10 @@ async def main(model: str = DEFAULT_MODEL, df_path: Path = DEFAULT_DATASET_PATH)
     results_path = DATA_DIR / "results" / f"{run_id}_predictions.json"
     write_results(results_path, examples, negative_examples)
 
+    logger.info(
+        f"Finished: Processed {len(examples)} items with {len(negative_examples)} negative predictions"
+    )
+
 
 if __name__ == "__main__":
     asyncio.run(main(model=DEFAULT_MODEL))
