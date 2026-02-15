@@ -4,7 +4,7 @@ from esci_ai.models import QueryFix, QueryProductExample, QueryProductMatch
 
 
 def create_classifier_agent(
-    model: str = "ollama:ministral-3:3b",
+    model: str = "ollama:ministral-3:8b",
     max_concurrency: int = 10,
     retries: int = 3,
 ) -> Agent:
@@ -76,11 +76,10 @@ Your task is to provide the MINIMAL SUBSTANTIVE FIX TO THE INCORRECT QUERY such 
 <DEFINITION OF EXACT MATCH>
 A product is an exact match when precisely every specification in the query is satisfied by the product information.
 - The product MAY have additional features, details, or attributes beyond what the query asks for. This is fine — only the query's specifications must be met.
-- Match on MEANING, not exact wording, except in cases where the query specifies technical product codes or model designations.
-- Use common sense and domain knowledge to interpret both queries and product details.
 </DEFINITION OF EXACT MATCH>
 <INSTRUCTIONS>
-1. Provide the MINIMAL SUBSTANTIVE FIX TO THE INCORRECT QUERY such that the product would be an exact match for it.
+1. Provide the MINIMAL SUBSTANTIVE FIX TO THE INCORRECT QUERY such that the product would be an exact match for it. To accomplish this, you may REVISE detail(s) that appear in the incorrect query (e.g. brand, counts, features, etc...), but DO NOT ADD specifics of levels of detail beyond the original query.
 2. The corrected_query field must contain your corrected query and nothing else.
+</INSTRUCTIONS>
 </INSTRUCTIONS>
 """
