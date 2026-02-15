@@ -12,6 +12,7 @@ wheels/
 # Data
 data/raw/*
 data/processed/*
+data/results/*
 .DS_Store
 
 # Marimo
