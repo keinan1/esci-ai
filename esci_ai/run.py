@@ -33,9 +33,10 @@ DATA_DIR = PROJECT_DIR / "data"
 DEFAULT_DATASET_PATH = DATA_DIR / "processed" / "examples_products_subset.parquet"
 # DEFAULT_DATASET_PATH = DATA_DIR / "processed" / "examples_products_random_1000.parquet"
 
+# DEFAULT_MODEL = "ollama:ministral-3:3b"
 DEFAULT_MODEL = "ollama:ministral-3:8b"
 # DEFAULT_MODEL = "ollama:ministral-3:14b"
-# DEFAULT_MODEL = "ollama:gpt-oss-20b"
+# DEFAULT_MODEL = "ollama:gpt-oss:20b"
 
 
 def setup_logging():
