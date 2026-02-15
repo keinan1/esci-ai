@@ -142,3 +142,9 @@ uv run -m esci_ai.run
 ```
 
 Run results, including performance metrics, are written to `data/results/`.
+
+### Run Notes
+
+`esci_ai/run.py` can be configured to use different models and input files.
+
+- On a random sample of 1000 examples, `ministral-3:8b` successfully returned 960 inferences, flagging 246 as negative (mismatched). Local inference time was several hours.
