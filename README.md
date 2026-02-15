@@ -115,11 +115,11 @@ Here we use Claude to categorize our manual error analysis into proper axial cod
 
 ### Step 4 - Second Pass Solution
 
-We update the prompts and re-run the experiment. Performance improves: using `ministral-3:3b` we get perfect accuracy. We also test on the larger `ministral-3:8b`, `ministral-3:14b`, and `gpt-oss-20b` models. Aside from two ambiguous test examples with inconsistent product information, all models perform with perfect accuracy on the testing set.
+We update the prompts and re-run the experiment. Performance improves: using `ministral-3:3b` we get near perfect accuracy (0.96). We also test on the larger `ministral-3:8b`, `ministral-3:14b`, and `gpt-oss-20b` models. Aside from two ambiguous test examples with inconsistent product information, the larger models perform with perfect accuracy on the testing set.
 
 With the classifer in place, we move to Task 2: correcting queries in mismatched cases. We create a `query_fix_agent` and run it just on the predicted mismatched examples.
 
-With tinkering to the prompt we get valid query fixes for all mismatched examples using the second smallest model, `ministral-3:8b`. While the smaller `ministral-3:3b` performed well most of the time, it failed to follow instructions in longer and more complicated cases, so we will assume it's not quite up to the task.01_
+With tinkering to the prompt we get valid query fixes for all mismatched examples using the second smallest model, `ministral-3:8b`. While the smaller `ministral-3:3b` performed well most of the time, it failed to follow instructions in longer and more complicated cases, so we will assume it's not quite up to the task.
 
 Run the notebook with:
 
@@ -129,8 +129,10 @@ uv run marimo edit notebooks/04_second_pass_solution.py
 
 ## Final Implementation
 
-The final python implementation is in `esci_ai/`. We organize the modules into proper files and classes. The script can be run with:
+The final python implementation is in `esci_ai/`. We organize into proper submodules, with an orchestration script and report generation. The script can be run with:
 
+```shell
+uv run -m esci_ai.run
 ```
 
-```
+Run results, including performance metrics, are written to `data/results/`.
