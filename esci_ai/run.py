@@ -53,25 +53,29 @@ def setup_observability():
 
 def load_examples(df_path: Path) -> list[QueryProductExample]:
     df = pl.read_parquet(df_path)
-
-    return [
-        QueryProductExample(
-            example_id=row["example_id"],
-            query_info=QueryInfo(
-                query_id=row["query_id"],
-                query=row["query"],
-            ),
-            product_info=ProductInfo(
-                product_id=row["product_id"],
-                product_title=row["product_title"],
-                product_description=row.get("product_description", ""),
-                product_bullet_point=row.get("product_bullet_point", ""),
-                product_brand=row["product_brand"],
-                product_color=row.get("product_color", ""),
-            ),
-        )
-        for row in df.to_dicts()
-    ]
+    examples = []
+    for row in df.to_dicts():
+        try:
+            examples.append(
+                QueryProductExample(
+                    example_id=row["example_id"],
+                    query_info=QueryInfo(
+                        query_id=row["query_id"],
+                        query=row["query"],
+                    ),
+                    product_info=ProductInfo(
+                        product_id=row["product_id"],
+                        product_title=row["product_title"],
+                        product_description=row.get("product_description", ""),
+                        product_bullet_point=row.get("product_bullet_point", ""),
+                        product_brand=row["product_brand"],
+                        product_color=row.get("product_color", ""),
+                    ),
+                )
+            )
+        except Exception:
+            continue
+    return examples
 
 
 async def get_classifications(
