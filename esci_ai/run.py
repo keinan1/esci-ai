@@ -79,7 +79,8 @@ def load_examples(df_path: Path) -> list[QueryProductExample]:
 
 
 async def get_classifications(
-    examples: list[QueryProductExample], model: str
+    examples: list[QueryProductExample],
+    model: str,
 ) -> list[AgentRunResult[QueryProductMatch]]:
     agent = create_classifier_agent(model)
     prompts = [create_classifier_prompt(e) for e in examples]
@@ -99,7 +100,8 @@ async def get_classifications(
 
 
 async def get_queryfixes(
-    examples: list[QueryProductExample], model: str
+    examples: list[QueryProductExample],
+    model: str,
 ) -> list[AgentRunResult[QueryFix]]:
     agent = create_queryfix_agent(model)
     prompts = [create_queryfix_prompt(e) for e in examples]
