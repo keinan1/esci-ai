@@ -76,7 +76,6 @@ And the main project dependencies will be:
     ollama pull ministral-3:14b
     ollama pull gpt-oss:latest
     ```
-    Note in testing we also use `ministral-3:8b`, and  `ministral-3:14b`, `gpt-oss:latest`.
 
 - Create a `.env` file 
 
