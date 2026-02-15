@@ -29,7 +29,8 @@ def get_classifier_performance(
         if p.query_product_match and p.query_product_match.match_classification
     ]
 
-    n = len(preds)
+    if len(preds) < 3:
+        return None
 
     # separate classifications: positive = pred exact match, negative = pred not exact match
     positives = [
