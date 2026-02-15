@@ -29,7 +29,13 @@ from esci_ai.performance import get_classifier_performance
 logger = logging.getLogger(__name__)
 PROJECT_DIR = Path(__file__).parent.parent
 DATA_DIR = PROJECT_DIR / "data"
+
+DEFAULT_DATASET_PATH = DATA_DIR / "processed" / "examples_products_subset.parquet"
+# DEFAULT_DATASET_PATH = DATA_DIR / "processed" / "examples_products_random_1000.parquet"
+
 DEFAULT_MODEL = "ollama:ministral-3:8b"
+# DEFAULT_MODEL = "ollama:ministral-3:14b"
+# DEFAULT_MODEL = "ollama:gpt-oss-20b"
 
 
 def setup_logging():
@@ -123,16 +129,14 @@ def write_results(
     logger.info(f"Prediction results written to {results_path}")
 
 
-async def main(model: str = DEFAULT_MODEL):
+async def main(model: str = DEFAULT_MODEL, df_path: Path = DEFAULT_DATASET_PATH):
     load_dotenv(find_dotenv())
     setup_logging()
     setup_observability()
 
     run_id = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{model}"
 
-    examples = load_examples(
-        DATA_DIR / "processed" / "examples_products_subset.parquet"
-    )
+    examples = load_examples(df_path)
 
     # run llm classifier
     classifier_results = await get_classifications(examples, model=model)
