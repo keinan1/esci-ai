@@ -81,14 +81,17 @@ def load_examples(df_path: Path) -> list[QueryProductExample]:
 async def get_classifications(
     examples: list[QueryProductExample],
     model: str,
-) -> list[AgentRunResult[QueryProductMatch]]:
+) -> list[AgentRunResult[QueryProductMatch] | BaseException]:
     agent = create_classifier_agent(model)
     prompts = [create_classifier_prompt(e) for e in examples]
 
     # run classifications; note, should properly set return_exceptions=True and filter failures, etc...
     start = time.time()
-    results: list[AgentRunResult[QueryProductMatch]] = await asyncio.gather(
-        *[agent.run(p) for p in prompts]
+    results: list[
+        AgentRunResult[QueryProductMatch] | BaseException
+    ] = await asyncio.gather(
+        *[agent.run(p) for p in prompts],
+        return_exceptions=True,  # maintains ordering, allows errors
     )
     elapsed = time.time() - start
 
@@ -102,14 +105,15 @@ async def get_classifications(
 async def get_queryfixes(
     examples: list[QueryProductExample],
     model: str,
-) -> list[AgentRunResult[QueryFix]]:
+) -> list[AgentRunResult[QueryFix] | BaseException]:
     agent = create_queryfix_agent(model)
     prompts = [create_queryfix_prompt(e) for e in examples]
 
     # run query fixes; note, should properly set return_exceptions=True and filter failures, etc...
     start = time.time()
-    results: list[AgentRunResult[QueryFix]] = await asyncio.gather(
-        *[agent.run(p) for p in prompts]
+    results: list[AgentRunResult[QueryFix] | BaseException] = await asyncio.gather(
+        *[agent.run(p) for p in prompts],
+        return_exceptions=True,  # maintains ordering, allows errors
     )
     elapsed = time.time() - start
 
@@ -148,7 +152,7 @@ async def main(model: str = DEFAULT_MODEL, df_path: Path = DEFAULT_DATASET_PATH)
     # run llm classifier
     classifier_results = await get_classifications(examples, model=model)
 
-    # add results to examples (this is fragile, ignore exceptions etc...)
+    # add results to examples, silently ignore run failures
     for e, r in zip(examples, classifier_results):
         e.query_product_match = r.output
 
@@ -171,7 +175,7 @@ async def main(model: str = DEFAULT_MODEL, df_path: Path = DEFAULT_DATASET_PATH)
     # run llm query fixer
     queryfix_results = await get_queryfixes(negative_examples, model=model)
 
-    # add results to negative predictions (again, fragile...)
+    # add results to negative predictions, silently ignore errors
     for e, r in zip(negative_examples, queryfix_results):
         e.query_fix = r.output
 
