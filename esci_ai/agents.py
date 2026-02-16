@@ -81,5 +81,4 @@ A product is an exact match when precisely every specification in the query is s
 1. Provide the MINIMAL SUBSTANTIVE FIX TO THE INCORRECT QUERY such that the product would be an exact match for it. To accomplish this, you may REVISE detail(s) that appear in the incorrect query (e.g. brand, counts, features, etc...), but DO NOT ADD specifics of levels of detail beyond the original query.
 2. The corrected_query field must contain your corrected query and nothing else.
 </INSTRUCTIONS>
-</INSTRUCTIONS>
 """
